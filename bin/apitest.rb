@@ -63,8 +63,8 @@ begin
 		:"currencyCode" => "GBP",
 		:"timeInForce" => "GOOD_TILL_CANCELLED",
 		:"guaranteedStop" => "false",
-		:"stopDistance" => "100",
-		:"limitDistance" => "100"
+		:"stopDistance" => 100,
+		:"limitDistance" => 100
 	}
 
 	response = RestClient.post("#{host}/gateway/deal/workingorders/otc",
