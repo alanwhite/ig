@@ -12,7 +12,7 @@ class IGService
   ###
   # login to IG
   #
-  def login(username, password)
+  def login(username:, password:)
 
 	request_body_map = {
 		:'identifier' => "#{username}",
@@ -52,9 +52,9 @@ class IGService
   ###
   # get buy/sell price
   #
-  def getPrice(instrument)
+  def getPrice(epic:)
     
-    response = RestClient.get("#{@host}/gateway/deal/markets/#{instrument}", @headers ) 
+    response = RestClient.get("#{@host}/gateway/deal/markets/#{epic}", @headers ) 
 
     if response.code == 200
       ftse = JSON.parse(response.body)
@@ -71,12 +71,12 @@ class IGService
   end
 
   ###
-  # place a sell order for a dfb 
+  # place a sell order
   #
-  def sellDFB(instrument,size,price,params)
+  def oldPlaceSellOrder(epic:,size:,price:,params: {} )
 
     limit_sell_map = {
-      :"epic" => instrument,
+      :"epic" => epic,
       :"expiry" => "DFB",
       :"direction" => "SELL",
       :"size" => size,
@@ -87,20 +87,103 @@ class IGService
       :"guaranteedStop" => "false"
     }.merge(params)
 
-    response = RestClient.post("#{host}/gateway/deal/workingorders/otc",
+    response = RestClient.post("#{@host}/gateway/deal/workingorders/otc",
       limit_sell_map.to_json, @headers ) 
 
-    puts "FTSE sell limit order response status: #{response.code}"
-    # puts response.body
-    orderresp = JSON.parse(response.body)
-    dealref = orderresp["dealReference"]
+    if response.code == 200
+      orderresp = JSON.parse(response.body)
+      dealref = orderresp["dealReference"]
+      { :success => true, :dealref => dealref }
+    else
+      { :success => false }
+    end
+
+    rescue => e
+      puts "placeSellOrder ERROR: #{e}"
+      { :success => false }
+
   end
 
-  ### 
-  # place a buy order for a dfb
+  ###
+  # Place a sell order
   #
-  def buyDFB(instrument,price,size,params)
+  def placeSellOrder(epic:,size:,price:,params: {} )
+
+    sell_order_params = {
+      :"epic" => epic,
+      :"size" => size,
+      :"level" => price,
+      :"type" => "LIMIT"
+    }
+
+    placeOrder(params: sell_order_params.merge(params))
+
   end
 
+  ###
+  # Place a buy order
+  #
+  def placeBuyOrder(epic:,size:,price:,params: {} )
+
+    buy_order_params = {
+      :"epic" => epic,
+      :"size" => size,
+      :"level" => price,
+      :"type" => "STOP"
+    }
+
+    placeOrder(params: buy_order_params.merge(params))
+
+  end
+
+  ###
+  # place an order
+  #
+  def placeOrder(params: {} )
+
+    order_details_map = {
+      :"expiry" => "DFB",
+      :"direction" => "SELL",
+      :"type" => "LIMIT",
+      :"currencyCode" => "GBP",
+      :"timeInForce" => "GOOD_TILL_CANCELLED",
+      :"guaranteedStop" => "false"
+    }.merge(params)
+    
+    response = RestClient.post("#{@host}/gateway/deal/workingorders/otc",
+      order_details_map.to_json, @headers ) 
+
+    if response.code == 200
+      orderresp = JSON.parse(response.body)
+      dealref = orderresp["dealReference"]
+      { :success => true, :dealref => dealref }
+    else
+      { :success => false }
+    end
+
+    rescue => e
+      puts "placeOrder ERROR: #{e}"
+      { :success => false }
+  end
+
+  ###
+  # get status of an order
+  #
+  def checkOrder(dealref)
+
+    response = RestClient.get("#{@host}/gateway/deal/confirms/#{dealref}", @headers )
+    if response.code == 200
+      confbody = JSON.parse(response.body)
+      { :success => true, :dealstatus => confbody['dealStatus'], 
+        :reason => confbody['reason'], :status => confbody['status'] }
+    else
+      { :success => false }
+    end
+
+    rescue => e
+      puts "checkOrder ERROR: #{e}"
+      { :success => false }
+
+  end  
 
 end
